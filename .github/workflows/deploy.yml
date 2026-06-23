@@ -47,17 +47,11 @@ jobs:
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "ref=${REGISTRY}/${IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
       - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            ${{ steps.image.outputs.ref }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          docker build -t "${{ steps.image.outputs.ref }}" .
+          docker tag "${{ steps.image.outputs.ref }}" "${REGISTRY}/${IMAGE_NAME}:${{ inputs.environment }}"
+          docker push "${{ steps.image.outputs.ref }}"
+          docker push "${REGISTRY}/${IMAGE_NAME}:${{ inputs.environment }}"
       - name: Configure Kubernetes
         run: |
           doctl kubernetes cluster kubeconfig save "${{ secrets.DO_CLUSTER_NAME }}"
