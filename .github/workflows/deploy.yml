@@ -32,6 +32,10 @@ jobs:
       - uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DO_ACCESS_TOKEN }}
+      - name: Validate DigitalOcean access
+        run: |
+          doctl account get
+          doctl registry get
       - name: Log in to DigitalOcean registry
         run: doctl registry login --expiry-seconds 1200
       - name: Resolve image tag
