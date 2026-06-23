@@ -37,7 +37,11 @@ jobs:
           doctl account get
           doctl registry get
       - name: Log in to DigitalOcean registry
-        run: doctl registry login --expiry-seconds 1200
+        uses: docker/login-action@v3
+        with:
+          registry: registry.digitalocean.com
+          username: ${{ secrets.DO_ACCESS_TOKEN }}
+          password: ${{ secrets.DO_ACCESS_TOKEN }}
       - name: Resolve image tag
         id: image
         env:
