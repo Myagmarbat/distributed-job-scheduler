@@ -1,0 +1,76 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        required: true
+        options: [staging, production]
+      image_tag:
+        description: "Image tag to deploy. Defaults to the triggering commit SHA."
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: registry.digitalocean.com/${{ secrets.DO_REGISTRY }}
+  IMAGE_NAME: scheduler
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+      - name: Log in to DigitalOcean registry
+        run: doctl registry login --expiry-seconds 1200
+      - name: Resolve image tag
+        id: image
+        env:
+          INPUT_TAG: ${{ inputs.image_tag }}
+        run: |
+          tag="${INPUT_TAG:-${GITHUB_SHA}}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "ref=${REGISTRY}/${IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.ref }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Configure Kubernetes
+        run: doctl kubernetes cluster kubeconfig save "${{ secrets.DO_CLUSTER_NAME }}"
+      - name: Upsert runtime secret
+        run: |
+          kubectl create secret generic scheduler-secrets \
+            --from-literal=DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+      - name: Apply manifests
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          kubectl delete job scheduler-migrate --ignore-not-found
+          kubectl apply -f deploy/k8s/valkey.yaml
+          sed "s|IMAGE_REF_PLACEHOLDER|${IMAGE_REF}|g" deploy/k8s/migration.yaml | kubectl apply -f -
+          kubectl wait --for=condition=complete --timeout=180s job/scheduler-migrate
+          sed "s|IMAGE_REF_PLACEHOLDER|${IMAGE_REF}|g" deploy/k8s/api.yaml | kubectl apply -f -
+          sed "s|IMAGE_REF_PLACEHOLDER|${IMAGE_REF}|g" deploy/k8s/worker.yaml | kubectl apply -f -
+          kubectl apply -f deploy/k8s/hpa.yaml
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/scheduler-api --timeout=180s
+          kubectl rollout status deployment/scheduler-worker --timeout=180s

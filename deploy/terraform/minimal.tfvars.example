@@ -1,0 +1,10 @@
+environment         = "production"
+region              = "nyc3"
+registry_name       = "scheduler-registry"
+cluster_name        = "scheduler-prod"
+node_size           = "s-1vcpu-2gb"
+min_nodes           = 1
+max_nodes           = 3
+database_name       = "scheduler-postgres"
+database_size       = "db-s-1vcpu-1gb"
+database_node_count = 1
