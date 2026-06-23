@@ -57,7 +57,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Configure Kubernetes
-        run: doctl kubernetes cluster kubeconfig save "${{ secrets.DO_CLUSTER_NAME }}"
+        run: |
+          doctl kubernetes cluster kubeconfig save "${{ secrets.DO_CLUSTER_NAME }}"
+          doctl kubernetes cluster registry add "${{ secrets.DO_CLUSTER_NAME }}"
       - name: Upsert runtime secret
         run: |
           kubectl create secret generic scheduler-secrets \
