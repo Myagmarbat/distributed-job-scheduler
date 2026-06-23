@@ -1,0 +1,37 @@
+name: Registry Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        required: true
+        options: [list, delete]
+      repository:
+        description: "Repository name to delete when action=delete."
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  registry:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+      - name: List repositories
+        if: inputs.action == 'list'
+        run: doctl registry repository list
+      - name: Delete repository
+        if: inputs.action == 'delete'
+        env:
+          REPOSITORY: ${{ inputs.repository }}
+        run: |
+          if [ -z "$REPOSITORY" ]; then
+            echo "repository input is required for delete" >&2
+            exit 1
+          fi
+          doctl registry repository delete "$REPOSITORY" --force
