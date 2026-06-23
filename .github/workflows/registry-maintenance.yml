@@ -24,7 +24,14 @@ jobs:
           token: ${{ secrets.DO_ACCESS_TOKEN }}
       - name: List repositories
         if: inputs.action == 'list'
-        run: doctl registry repository list
+        env:
+          REPOSITORY: ${{ inputs.repository }}
+        run: |
+          doctl registry repository list
+          if [ -n "$REPOSITORY" ]; then
+            doctl registry repository list-manifests "$REPOSITORY" || true
+            doctl registry repository list-tags "$REPOSITORY" || true
+          fi
       - name: Delete repository
         if: inputs.action == 'delete'
         env:
@@ -44,3 +51,13 @@ jobs:
               doctl registry repository delete-tag "$REPOSITORY" "$tag" --force
             fi
           done <<< "$tags"
+          manifests="$(doctl registry repository list-manifests "$REPOSITORY" | awk 'NR > 1 && $1 != "" { print $1 }')"
+          if [ -z "$manifests" ]; then
+            echo "No manifests found for repository $REPOSITORY"
+            exit 0
+          fi
+          while IFS= read -r manifest; do
+            if [ -n "$manifest" ]; then
+              doctl registry repository delete-manifest "$REPOSITORY" "$manifest" --force
+            fi
+          done <<< "$manifests"
