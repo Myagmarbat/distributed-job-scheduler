@@ -37,7 +37,7 @@ jobs:
           doctl account get
           doctl registry get
       - name: Log in to DigitalOcean registry
-        run: doctl registry login --read-write --expiry-seconds 1200
+        run: doctl registry login --expiry-seconds 1200
       - name: Resolve image tag
         id: image
         env:
