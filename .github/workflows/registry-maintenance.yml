@@ -34,7 +34,7 @@ jobs:
             echo "repository input is required for delete" >&2
             exit 1
           fi
-          tags="$(doctl registry repository list-tags "$REPOSITORY" --format Tag --no-header)"
+          tags="$(doctl registry repository list-tags "$REPOSITORY" | awk 'NR > 1 && $1 != "" { print $1 }')"
           if [ -z "$tags" ]; then
             echo "No tags found for repository $REPOSITORY"
             exit 0
