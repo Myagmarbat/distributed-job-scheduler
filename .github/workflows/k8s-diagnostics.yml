@@ -1,0 +1,33 @@
+name: Kubernetes Diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        required: true
+        options: [staging, production]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+      - name: Configure Kubernetes
+        run: doctl kubernetes cluster kubeconfig save "${{ secrets.DO_CLUSTER_NAME }}"
+      - name: Inspect scheduler resources
+        run: |
+          kubectl get pods -o wide
+          kubectl get jobs
+          kubectl get events --sort-by=.lastTimestamp | tail -100
+          kubectl describe job scheduler-migrate || true
+          kubectl logs job/scheduler-migrate --all-containers=true || true
+          kubectl describe deployment scheduler-api || true
+          kubectl describe deployment scheduler-worker || true
+          kubectl describe deployment scheduler-valkey || true
