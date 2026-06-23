@@ -51,6 +51,8 @@ jobs:
         with:
           context: .
           push: true
+          provenance: false
+          sbom: false
           tags: |
             ${{ steps.image.outputs.ref }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.environment }}
