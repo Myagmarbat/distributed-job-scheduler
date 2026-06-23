@@ -34,4 +34,13 @@ jobs:
             echo "repository input is required for delete" >&2
             exit 1
           fi
-          doctl registry repository delete "$REPOSITORY" --force
+          tags="$(doctl registry repository list-tags "$REPOSITORY" --format Tag --no-header)"
+          if [ -z "$tags" ]; then
+            echo "No tags found for repository $REPOSITORY"
+            exit 0
+          fi
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              doctl registry repository delete-tag "$REPOSITORY" "$tag" --force
+            fi
+          done <<< "$tags"
